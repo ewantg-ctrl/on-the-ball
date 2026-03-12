@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ On the Ball — Leaderboard</title>
+<style>
+  :root {
+    --guardian-blue: #052962;
+    --guardian-yellow: #FFE500;
+    --light-blue: #EBF3FB;
+    --border: #d9d9d9;
+    --text: #222222;
+    --muted: #767676;
+    --bg: #f6f6f6;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: var(--guardian-blue); padding: 0 24px;
+    display: flex; align-items: center; gap: 16px; height: 56px;
+  }
+  header h1 { font-family: Arial, sans-serif; color: #fff; font-size: 22px; font-weight: 700; }
+  .header-pill {
+    background: var(--guardian-yellow); color: var(--guardian-blue);
+    font-size: 11px; font-weight: 700; font-family: Arial, sans-serif;
+    padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .header-spacer { flex: 1; }
+  #refresh-btn {
+    display: none; background: none; border: 1px solid rgba(255,255,255,0.4);
+    color: #fff; font-family: Arial, sans-serif; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 4px; cursor: pointer; transition: background 0.15s;
+  }
+  #refresh-btn:hover { background: rgba(255,255,255,0.1); }
+
+  /* ── Loading / Error states ── */
+  #status-screen {
+    max-width: 560px; margin: 64px auto; padding: 0 24px; text-align: center;
+  }
+  #status-screen .icon { font-size: 52px; display: block; margin-bottom: 16px; }
+  #status-screen h2 { font-family: Arial, sans-serif; font-size: 20px; color: var(--guardian-blue); margin-bottom: 10px; }
+  #status-screen p { font-family: Arial, sans-serif; font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--light-blue);
+    border-top-color: var(--guardian-blue); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Setup notice (shown when URL not configured) ── */
+  #setup-notice {
+    max-width: 600px; margin: 48px auto; padding: 0 24px;
+  }
+  .notice-card {
+    background: var(--white); border-radius: 8px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .notice-card-header {
+    background: var(--guardian-blue); color: #fff;
+    font-family: Arial, sans-serif; font-size: 15px; font-weight: 700;
+    padding: 14px 20px;
+  }
+  .notice-card-body { padding: 20px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.7; color: var(--text); }
+  .notice-card-body code {
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #c70000;
+  }
+  .step { display: flex; gap: 14px; margin-bottom: 16px; }
+  .step-num {
+    width: 26px; height: 26px; background: var(--guardian-blue); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* ── Dashboard ── */
+  #dashboard { display: none; max-width: 900px; margin: 0 auto; padding: 24px; }
+
+  .dash-meta {
+    font-family: Arial, sans-serif; font-size: 12px; color: var(--muted);
+    margin-bottom: 20px; display: flex; align-items: center; gap: 6px;
+  }
+  .dash-meta .dot { width: 7px; height: 7px; background: #2ecc71; border-radius: 50%; }
+
+  .trophy-banner {
+    background: linear-gradient(135deg, var(--guardian-blue) 0%, #0a4fa8 100%);
+    color: #fff; border-radius: 8px; padding: 18px 22px;
+    display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(5,41,98,0.25);
+  }
+  .trophy-banner .trophy-emoji { font-size: 36px; }
+  .trophy-banner h3 { font-family: Arial, sans-serif; font-size: 13px; font-weight: 400; opacity: 0.8; margin-bottom: 2px; }
+  .trophy-banner .winner-name { font-family: Arial, sans-serif; font-size: 22px; font-weight: 700; color: var(--guardian-yellow); }
+  .trophy-banner .winner-score { font-family: Arial, sans-serif; font-size: 14px; opacity: 0.75; margin-top: 2px; }
+
+  .boards-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px; margin-bottom: 28px;
+  }
+  .board-card { background: var(--white); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .board-card-header {
+    background: var(--guardian-blue); color: #fff;
+    font-family: Arial, sans-serif; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px; padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .board-card-header .period-label { margin-left: auto; font-size: 10px; font-weight: 400; opacity: 0.75; text-transform: none; letter-spacing: 0; }
+
+  .leaderboard { width: 100%; border-collapse: collapse; }
+  .leaderboard tr { border-bottom: 1px solid var(--border); }
+  .leaderboard tr:last-child { border-bottom: none; }
+  .leaderboard tr:hover { background: var(--light-blue); }
+  .leaderboard td { padding: 11px 16px; font-family: Arial, sans-serif; font-size: 14px; }
+  .rank-cell { width: 36px; text-align: center; }
+  .medal { font-size: 18px; line-height: 1; }
+  .rank-num {
+    width: 22px; height: 22px; background: var(--bg); border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--muted);
+  }
+  .player-name { font-weight: 600; color: var(--text); }
+  .player-name.winner { color: var(--guardian-blue); }
+  .score-cell { text-align: right; font-weight: 700; font-size: 16px; color: var(--guardian-blue); white-space: nowrap; }
+  .score-cell .games-played { font-size: 10px; font-weight: 400; color: var(--muted); display: block; text-align: right; }
+  .score-cell.no-data { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+  .bar-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-name { font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; width: 90px; flex-shrink: 0; }
+  .bar-wrap { flex: 1; height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; background: var(--guardian-blue); transition: width 0.6s ease; }
+  .bar-fill.rank1 { background: var(--guardian-blue); }
+  .bar-fill.rank2 { background: #4a90d9; }
+  .bar-fill.rank3 { background: #85b8e8; }
+  .bar-fill.rank4 { background: #b8d4ef; }
+  .bar-score { font-family: Arial, sans-serif; font-size: 13px; font-weight: 700; color: var(--guardian-blue); width: 36px; text-align: right; }
+
+  .section-label {
+    font-family: Arial, sans-serif; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted);
+    margin-bottom: 10px; margin-top: 24px; border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  .recent-card { background: var(--white); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .recent-table { width: 100%; border-collapse: collapse; }
+  .recent-table th {
+    background: var(--guardian-blue); color: #fff; font-family: Arial, sans-serif;
+    font-size: 12px; font-weight: 700; padding: 10px 14px; text-align: left;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .recent-table th:not(:first-child) { text-align: center; }
+  .recent-table td { padding: 9px 14px; font-family: Arial, sans-serif; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .recent-table td:not(:first-child) { text-align: center; font-weight: 600; }
+  .recent-table tr:hover { background: var(--light-blue); }
+  .recent-table tr:last-child td { border-bottom: none; }
+  .recent-table .date-cell { color: var(--muted); font-size: 12px; }
+  .daily-winner { background: var(--guardian-yellow) !important; }
+  .empty { color: var(--border); font-weight: 400; }
+  .no-data-msg { padding: 24px; text-align: center; font-family: Arial, sans-serif; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ On the Ball</h1>
+  <span class="header-pill">Leaderboard</span>
+  <div class="header-spacer"></div>
+  <button id="refresh-btn" onclick="loadScores()">↻ Refresh</button>
+</header>
+
+<!-- Loading -->
+<div id="status-screen" style="display:none">
+  <div class="spinner"></div>
+  <h2 id="status-title">Loading scores…</h2>
+  <p id="status-msg"></p>
+</div>
+
+<!-- Setup notice (shown when DATA_URL is not configured) -->
+<div id="setup-notice">
+  <div class="notice-card">
+    <div class="notice-card-header">⚙️ One-time setup needed</div>
+    <div class="notice-card-body">
+      <p style="margin-bottom:18px">This site needs to know where to fetch the scores CSV from. Follow these steps once — after that, just upload a new CSV to update everyone's view.</p>
+
+      <div class="step"><div class="step-num">1</div><div>Go to <strong>github.com</strong> and create a free account (or sign in if you have one).</div></div>
+      <div class="step"><div class="step-num">2</div><div>Create a new <strong>public repository</strong> — name it something like <code>on-the-ball</code>.</div></div>
+      <div class="step"><div class="step-num">3</div><div>Upload <strong>this file</strong> (rename it <code>index.html</code>) and your <strong>scores CSV</strong> (name it <code>scores.csv</code>) into the repository.</div></div>
+      <div class="step"><div class="step-num">4</div><div>In the repository, go to <strong>Settings → Pages</strong>, set Source to <em>Deploy from a branch</em>, branch = <code>main</code>, folder = <code>/ (root)</code>, and click Save.</div></div>
+      <div class="step"><div class="step-num">5</div><div>Open <code>index.html</code> in GitHub, click the pencil (edit) icon, and change the line near the top that says:<br><br>
+        <code>DATA_URL: null</code><br><br>
+        to:<br><br>
+        <code>DATA_URL: 'https://raw.githubusercontent.com/YOUR_USERNAME/on-the-ball/main/scores.csv'</code><br><br>
+        Replace <code>YOUR_USERNAME</code> with your GitHub username. Commit the change.</div></div>
+      <div class="step"><div class="step-num">6</div><div>Your site will be live at <code>https://YOUR_USERNAME.github.io/on-the-ball</code> — share this link with your group!</div></div>
+
+      <p style="margin-top:18px;color:var(--muted)"><strong>To update scores:</strong> Export a new CSV from Excel, go to your GitHub repo, click on <code>scores.csv</code>, then click the upload/replace icon to drop the new file in. The site updates within a minute.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="dash-meta">
+    <span class="dot"></span>
+    <span id="last-updated">Scores loaded</span>
+  </div>
+
+  <div class="trophy-banner" id="trophy-banner">
+    <span class="trophy-emoji">🏆</span>
+    <div>
+      <h3>This week's leader</h3>
+      <div class="winner-name" id="week-leader-name">—</div>
+      <div class="winner-score" id="week-leader-score"></div>
+    </div>
+  </div>
+
+  <div class="boards-grid">
+    <div class="board-card">
+      <div class="board-card-header">📅 This Week <span class="period-label" id="week-label"></span></div>
+      <div id="week-bars"></div>
+    </div>
+    <div class="board-card">
+      <div class="board-card-header">🗓️ This Month <span class="period-label" id="month-label"></span></div>
+      <table class="leaderboard" id="month-table"></table>
+    </div>
+    <div class="board-card">
+      <div class="board-card-header">🏅 All Time <span class="period-label" id="alltime-label"></span></div>
+      <table class="leaderboard" id="alltime-table"></table>
+    </div>
+  </div>
+
+  <div class="section-label">Recent Scores</div>
+  <div class="recent-card">
+    <table class="recent-table" id="recent-table"></table>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  CONFIG — change DATA_URL once you've set up GitHub
+// ══════════════════════════════════════════════════════════════════
+const CONFIG = {
+  DATA_URL: null,
+  // Example: 'https://raw.githubusercontent.com/ewantg/on-the-ball/main/scores.csv'
+};
+// ══════════════════════════════════════════════════════════════════
+
+// ── Date helpers ─────────────────────────────────────────────────
+function getMondayOfWeek(d) {
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const m = new Date(d); m.setDate(d.getDate() + diff); m.setHours(0,0,0,0); return m;
+}
+function formatDate(d) { return d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }); }
+function formatShort(d) { return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
+
+// ── CSV parser ───────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const players = headers.slice(1).filter(Boolean);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    const dateStr = cols[0]; if (!dateStr) continue;
+    const date = parseDate(dateStr); if (!date) continue;
+    const scores = {};
+    players.forEach((p, idx) => { const v = parseFloat(cols[idx+1]); scores[p] = isNaN(v) ? null : v; });
+    rows.push({ date, scores });
+  }
+  rows.sort((a, b) => b.date - a.date);
+  return { players, rows };
+}
+
+function parseDate(str) {
+  str = str.trim(); let m;
+  if ((m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return new Date(+m[3], +m[2]-1, +m[1]);
+  if ((m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if ((m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/))) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+// ── Aggregation ──────────────────────────────────────────────────
+function aggregate(rows, players, fn) {
+  const totals = {}, counts = {};
+  players.forEach(p => { totals[p] = 0; counts[p] = 0; });
+  rows.filter(r => fn(r.date)).forEach(r => {
+    players.forEach(p => { if (r.scores[p] !== null) { totals[p] += r.scores[p]; counts[p]++; } });
+  });
+  return players.map(p => ({ name:p, total:totals[p], games:counts[p] })).sort((a,b) => b.total - a.total);
+}
+
+// ── Render ───────────────────────────────────────────────────────
+const MEDALS = ['🥇','🥈','🥉'];
+
+function renderTable(el, standings) {
+  if (!standings.length || standings.every(s => s.games === 0)) {
+    el.innerHTML = '<tr><td class="no-data-msg">No data for this period</td></tr>'; return;
+  }
+  el.innerHTML = '';
+  standings.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank-cell">${i < 3 ? `<span class="medal">${MEDALS[i]}</span>` : `<span class="rank-num">${i+1}</span>`}</td>
+      <td class="player-name${i===0?' winner':''}">${s.name}</td>
+      <td class="score-cell${s.games===0?' no-data':''}">
+        ${s.games===0 ? 'No games' : s.total}
+        ${s.games>0 ? `<span class="games-played">${s.games} game${s.games!==1?'s':''}</span>` : ''}
+      </td>`;
+    el.appendChild(tr);
+  });
+}
+
+function renderBars(el, standings) {
+  if (!standings.length || standings.every(s => s.games === 0)) {
+    el.innerHTML = '<div class="no-data-msg">No games this week yet</div>'; return;
+  }
+  const max = Math.max(...standings.map(s => s.total), 1);
+  el.innerHTML = '';
+  standings.forEach((s, i) => {
+    const pct = s.games === 0 ? 0 : Math.round((s.total/max)*100);
+    const d = document.createElement('div'); d.className = 'bar-row';
+    d.innerHTML = `
+      <div class="bar-name">${MEDALS[i]||''} ${s.name}</div>
+      <div class="bar-wrap"><div class="bar-fill rank${i+1}" style="width:${pct}%"></div></div>
+      <div class="bar-score">${s.games===0?'–':s.total}</div>`;
+    el.appendChild(d);
+  });
+}
+
+function renderRecent(tableEl, players, rows) {
+  const recent = rows.slice(0,15);
+  if (!recent.length) { tableEl.innerHTML='<tr><td>No data</td></tr>'; return; }
+  const thead = document.createElement('thead');
+  thead.innerHTML = `<tr><th>Date</th>${players.map(p=>`<th>${p}</th>`).join('')}</tr>`;
+  tableEl.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  recent.forEach(row => {
+    const vals = players.map(p => row.scores[p]);
+    const valid = vals.filter(v => v !== null);
+    const max = valid.length ? Math.max(...valid) : -Infinity;
+    const tr = document.createElement('tr');
+    const cells = players.map((p,i) => {
+      const s = row.scores[p];
+      const winner = s !== null && s === max && valid.length > 1;
+      return `<td class="${winner?'daily-winner':''}">${s !== null ? s : '<span class="empty">—</span>'}</td>`;
+    }).join('');
+    tr.innerHTML = `<td class="date-cell">${formatDate(row.date)}</td>${cells}`;
+    tbody.appendChild(tr);
+  });
+  tableEl.appendChild(tbody);
+}
+
+function renderDashboard(data) {
+  const { players, rows } = data;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekStart = getMondayOfWeek(today);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  document.getElementById('week-label').textContent = `${formatShort(weekStart)} – ${formatShort(today)}`;
+  document.getElementById('month-label').textContent = today.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  document.getElementById('alltime-label').textContent = `${rows.length} day${rows.length!==1?'s':''} total`;
+
+  const weekS  = aggregate(rows, players, d => d >= weekStart && d <= today);
+  const monthS = aggregate(rows, players, d => d >= monthStart && d <= today);
+  const allS   = aggregate(rows, players, () => true);
+
+  const leader = weekS.find(s => s.games > 0);
+  if (leader) {
+    document.getElementById('week-leader-name').textContent = leader.name;
+    document.getElementById('week-leader-score').textContent = `${leader.total} pts from ${leader.games} game${leader.games!==1?'s':''}`;
+  } else {
+    document.getElementById('trophy-banner').style.display = 'none';
+  }
+
+  renderBars(document.getElementById('week-bars'), weekS);
+  renderTable(document.getElementById('month-table'), monthS);
+  renderTable(document.getElementById('alltime-table'), allS);
+  renderRecent(document.getElementById('recent-table'), players, rows);
+
+  document.getElementById('last-updated').textContent =
+    `Scores loaded · ${rows.length} entries · updated ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+
+  document.getElementById('status-screen').style.display = 'none';
+  document.getElementById('setup-notice').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('refresh-btn').style.display = 'block';
+}
+
+// ── Load ─────────────────────────────────────────────────────────
+function showStatus(title, msg) {
+  document.getElementById('status-title').textContent = title;
+  document.getElementById('status-msg').textContent = msg;
+  document.getElementById('status-screen').style.display = 'block';
+  document.getElementById('setup-notice').style.display = 'none';
+}
+
+async function loadScores() {
+  if (!CONFIG.DATA_URL) {
+    document.getElementById('setup-notice').style.display = 'block';
+    document.getElementById('status-screen').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('setup-notice').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
+  showStatus('Loading scores…', '');
+
+  try {
+    // Add cache-busting so GitHub serves fresh CSV
+    const url = CONFIG.DATA_URL + '?t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const data = parseCSV(text);
+    if (!data || data.rows.length === 0) throw new Error('CSV appears empty or unreadable');
+    renderDashboard(data);
+  } catch (err) {
+    showStatus('Could not load scores', `Error: ${err.message}. Check that the DATA_URL in index.html is correct and the GitHub repo is public.`);
+  }
+}
+
+loadScores();
+</script>
+</body>
+</html>
